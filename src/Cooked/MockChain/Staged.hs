@@ -39,7 +39,6 @@ import Cooked.Tweak.Common
 import Data.Default
 import qualified Ledger.Slot as Ledger
 import qualified Ledger.Tx as Ledger
-import qualified Ledger.Tx.CardanoAPI as Ledger
 import qualified Ledger.Typed.Scripts as Pl
 import qualified Plutus.V2.Ledger.Api as Pl
 
@@ -145,7 +144,7 @@ instance InterpLtl (UntypedTweak InterpMockChain) MockChainBuiltin InterpMockCha
         StateT [Ltl (UntypedTweak InterpMockChain)] InterpMockChain Ledger.CardanoTx
       interpretAndTell (UntypedTweak now) later = do
         mcst <- lift get
-        let managedTxOuts = getIndex . mcstIndex $ mcst
+        let managedTxOuts = utxoIndexToTxOutMap . mcstIndex $ mcst
             managedDatums = mcstDatums mcst
         (_, skel') <- lift $ runTweakInChain now skel
         lift $
@@ -153,14 +152,14 @@ instance InterpLtl (UntypedTweak InterpMockChain) MockChainBuiltin InterpMockCha
             tell $
               MockChainLog
                 [ MCLogSubmittedTxSkel
-                    (SkelContext (txOutV2FromLedger <$> managedTxOuts) managedDatums)
+                    (SkelContext managedTxOuts managedDatums)
                     skel'
                 ]
         tx <- validateTxSkel skel'
         lift $
           lift $
             tell $
-              MockChainLog [MCLogNewTx (Ledger.fromCardanoTxId $ Ledger.getCardanoTxId tx)]
+              MockChainLog [MCLogNewTx (Ledger.getCardanoTxId tx)]
         put later
         return tx
   interpBuiltin (TxOutByRefLedger o) = txOutByRefLedger o
